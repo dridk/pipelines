@@ -1,0 +1,8 @@
+---
+ref: "/PUBLIC_DATA/ReferenceGenomes/GRCh38/bwa_index/GRCh38.p2.ref.fa"
+snpEff_ref : "GRCh38.p2.RefSeq"
+workdir: "raw"
+samples:
+  - ASmall
+  - BSmall
+
