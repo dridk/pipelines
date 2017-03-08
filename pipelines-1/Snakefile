@@ -1,5 +1,11 @@
+
 configfile : "config.yaml"
 workdir: config["workdir"]
+
+
+rule all:
+	input:
+		"PAN150427.vcf.gz","PKD160706.vcf.gz"
 
 
 rule qcreport:
@@ -13,6 +19,8 @@ rule qcreport:
 		"mkdir -p html;"
 		"fastqc {input} -o html 2>&1 > {log}"
 
+
+
 rule unzip:
 	input:
 		"{filename}.gz"
@@ -20,6 +28,8 @@ rule unzip:
 		"{filename}"
 	shell:
 		"gzip -d {input}"
+
+
 
 rule alignment:
 	input:
@@ -31,29 +41,36 @@ rule alignment:
 	log:
 		"{sample}.bwa.log"
 	shell:
-		"bwa mem -t {threads} {config[ref]} {input.fwd} {input.rev} > {output}  2> {log}"
+		"bwa mem -R '@RG\tID:mygroup\tSM:{wildcards.sample}\tLB:library1' -t {threads} {config[ref]} {input.fwd} {input.rev} > {output}  2> {log}"
+
+
 
 rule sorting_sam:
 	input:
 		"{sample}.sam"
 	output:
 		"{sample}.sorted.sam"
+	threads:
+		128
 	log:
 		"{sample}.sorted.log"
 	shell:
-		"picard-tools SortSam INPUT={input} OUTPUT={output} SORT_ORDER=coordinate 2> {log}"
+		#"picard-tools SortSam INPUT={input} OUTPUT={output} SORT_ORDER=coordinate 2> {log}"
+		"samtools sort {input} --threads {threads} -o {output}"
 
 
-rule mark_duplicate:
-	input:
-		"{sample}.sorted.sam"
-	output:
-		"{sample}.markDuplicate.sam",
-		"{sample}.markDuplicate.metrics"
-	log:
-		"{sample}.markDuplicate.log"
-	shell:
-		"picard-tools MarkDuplicatesWithMateCigar INPUT={input} OUTPUT={output[0]} M={output[1]} 2> {log}"
+
+# rule mark_duplicate:
+# 	input:
+# 		"{sample}.sorted.sam"
+# 	output:
+# 		"{sample}.markDuplicate.sam",
+# 		"{sample}.markDuplicate.metrics"
+# 	log:
+# 		"{sample}.markDuplicate.log"
+# 	shell:
+# 		"picard-tools MarkDuplicatesWithMateCigar INPUT={input} OUTPUT={output[0]} M={output[1]} 2> {log}"
+
 
 
 #Rule sam to bam 
@@ -65,6 +82,8 @@ rule sam_to_bam:
 	shell:
 		"samtools view  -Sbh {input} > {output.bam}"
 
+
+
 rule index_bam:
 	input:
 		"{filename}.bam"
@@ -74,16 +93,18 @@ rule index_bam:
 		"samtools index {input} {output}"
 
 
+
 rule variant_calling:
 	input:
-		bam = "{sample}.markDuplicate.bam",
-		bai = "{sample}.markDuplicate.bam.bai"
+		bam = "{sample}.sorted.bam",
+		bai = "{sample}.sorted.bam.bai"
 	output:
 		"{sample}.vcf.gz"
 	log:
 		"{sample}.vcf.log"
 	shell:
 		"samtools mpileup -ugf {config[ref]} {input.bam} | bcftools call -vmO z -o {output}  2> {log}"
+
 
 
 rule annotation_snpeff:
@@ -94,4 +115,4 @@ rule annotation_snpeff:
 	log:
 		"{sample}.snpeff.log"
 	shell:
-		"snpEff {config[snpEff_ref]} {input} > {output}  2> {log}"
+		"snpEff -Xmx8g -v {config[snpEff_ref]} {input} > {output} "
